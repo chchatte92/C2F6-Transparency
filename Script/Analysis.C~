@@ -1,0 +1,123 @@
+#include <iostream>
+#include <vector>
+#include <cstdio>
+#include <cstring>
+#include <cmath>
+
+#include "TGraphErrors.h"
+
+#define MAX_LINE 2048
+
+void Analysis() {
+
+    const int Ncycles = 10;
+
+    std::vector<double> lambda;
+    std::vector<double> lambdaEr;
+    std::vector< std::vector<double> > TranspN2(Ncycles);
+
+    char fname[256];
+
+    for (int i = 0; i < Ncycles; i++) {
+
+        sprintf(fname,
+                "../nitro_8bar_baseline_05_13/C2F6_3bar.Sample.Cycle%d.ASC",
+                i + 1);
+
+        std::cout << "Reading: " << fname << std::endl;
+
+        FILE *infile = fopen(fname, "r");
+        if (!infile) {
+            std::cerr << "Cannot open file: " << fname << std::endl;
+            continue;
+        }
+
+        char line[MAX_LINE];
+        bool foundData = false;
+
+        while (fgets(line, sizeof(line), infile)) {
+            line[strcspn(line, "\r\n")] = 0;
+            if (strcmp(line, "#DATA") == 0) {
+                foundData = true;
+                break;
+            }
+        }
+
+        if (!foundData) {
+            std::cerr << "#DATA not found in " << fname << std::endl;
+            fclose(infile);
+            continue;
+        }
+
+        double x, y;
+        int idx = 0;
+
+        while (fscanf(infile, "%lf %lf", &x, &y) == 2) {
+
+            // store wavelength only once (assumes identical grid)
+            if (i == 0) {
+                lambda.push_back(x);
+                lambdaEr.push_back(1.0);
+            }
+
+            TranspN2[i].push_back(y);
+            idx++;
+        }
+
+        fclose(infile);
+    }
+
+    const int Npoints = lambda.size();
+
+    if (Npoints == 0) {
+        std::cerr << "No data loaded." << std::endl;
+        return;
+    }
+
+    std::vector<double> mean(Npoints, 0.0);
+    std::vector<double> sigma(Npoints, 0.0);
+
+    // compute mean
+    for (int l = 0; l < Npoints; l++) {
+
+        double sum = 0.0;
+        int validCycles = 0;
+
+        for (int i = 0; i < Ncycles; i++) {
+            if (l < (int)TranspN2[i].size()) {
+                sum += TranspN2[i][l];
+                validCycles++;
+            }
+        }
+
+        if (validCycles == 0) continue;
+
+        mean[l] = sum / validCycles;
+
+        double var = 0.0;
+
+        for (int i = 0; i < Ncycles; i++) {
+            if (l < (int)TranspN2[i].size()) {
+                double d = TranspN2[i][l] - mean[l];
+                var += d * d;
+            }
+        }
+
+        sigma[l] = std::sqrt(var / validCycles);
+    }
+
+    // ROOT graph
+    TGraphErrors *g = new TGraphErrors(
+        Npoints,
+        &lambda[0],
+        &mean[0],
+        &lambdaEr[0],
+        &sigma[0]
+    );
+
+    g->SetMarkerStyle(20);
+    g->SetMarkerColor(kBlue);
+    g->SetTitle("Transmission;Wavelength;Transmission");
+
+    g->Draw("AP");
+}

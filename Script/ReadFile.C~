@@ -1,0 +1,28 @@
+#define MAX_LINE 2048;
+void ReadFile(){
+  const char * fname ="../nitro_8bar_baseline_05_13/C2F6_3bar.Sample.Cycle1.ASC";
+
+  FILE *infile;
+  infile =  fopen(fname, "r");
+  int foundData =0;
+  char line[MAX_LINE];
+  while(fgets(line,sizeof(line),infile)){
+    line[strcspn(line, "\r\n")] = 0;
+
+    if (strcmp(line, "#DATA") == 0) {
+      found_data = 1;
+      break;
+    }
+  }
+  // Read two-column data
+  double x, y;
+
+  while (fscanf(fp, "%lf %lf", &x, &y) == 2) {
+
+    // Process data here
+    printf("%f   %f\n", x, y);
+  }
+
+  fclose(fp);
+
+}
